@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Interview Bot</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .chat { border: 1px solid #ddd; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        button { padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>AI Interview Assistant</h1>
+    
+    {% if state == "start" %}
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <label>Upload your resume (PDF):</label>
+        <input type="file" name="resume" accept=".pdf" required>
+        <button type="submit">Start Interview</button>
+    </form>
+    {% elif state == "question" %}
+    <div class="chat">
+        <p><strong>Question {{ question_num }}:</strong> {{ question }}</p>
+    </div>
+    <form action="/answer" method="post">
+        <label>Your Answer:</label>
+        <textarea name="answer" rows="5" required></textarea>
+        <input type="hidden" name="session_id" value="{{ session_id }}">
+        <button type="submit">Submit Answer</button>
+    </form>
+    {% elif state == "assessment" %}
+    <div class="chat">
+        <h2>Interview Assessment</h2>
+        <p>{{ assessment }}</p>
+    </div>
+    <a href="/"><button>Start New Interview</button></a>
+    {% endif %}
+</body>
+</html>
