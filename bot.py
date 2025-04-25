@@ -5,6 +5,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import LLMChain
 import os
 import uuid
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -12,12 +15,11 @@ UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-GEMINI_API_KEY = 'AIzaSyDNWB9etacm3TTs_LJf9avy0zlPOgXgKWs' # Initialize Gemini model
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_API_KEY)
 
 SESSIONS = {}  
 
-# Define prompt templates
 FIRST_QUESTION_TEMPLATE = """Thank you for uploading your resume. Based on your listed experiences, projects, and technical skills, please answer the following questions as part of your AI Engineer interview:
 (Only ask one question, do not summarize the resume. Assume you're the interviewer assessing the candidate's suitability for an AI Engineer role.)
 
@@ -45,7 +47,7 @@ Here is the resume:
 Based on the responses, provide a short evaluation of the candidate's strengths, areas to improve, and their suitability for the AI Engineer role.
 Respond in a professional, concise tone with 3 bullet points."""
 
-first_question_chain = LLMChain(llm=llm, prompt=PromptTemplate(template=FIRST_QUESTION_TEMPLATE, input_variables=["resume_text"])) # Create LLM chains
+first_question_chain = LLMChain(llm=llm, prompt=PromptTemplate(template=FIRST_QUESTION_TEMPLATE, input_variables=["resume_text"]))
 next_question_chain = LLMChain(llm=llm, prompt=PromptTemplate(template=NEXT_QUESTION_TEMPLATE, input_variables=["resume_text", "chat_history"]))
 assessment_chain = LLMChain(llm=llm, prompt=PromptTemplate(template=ASSESSMENT_TEMPLATE, input_variables=["chat_history", "resume_text"]))
 
@@ -62,18 +64,18 @@ def upload_resume():
     if file.filename == '':
         return jsonify({"error": "Empty file selected"}), 400
     
-    filename = f"{uuid.uuid4().hex}.pdf" # Generate unique filename
+    filename = f"{uuid.uuid4().hex}.pdf"
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
     
     try:
-        loader = PyPDFLoader(filepath) # Extract text from PDF
+        loader = PyPDFLoader(filepath)
         pages = loader.load()
         resume_text = " ".join([page.page_content for page in pages])
         
-        first_question = first_question_chain.run(resume_text=resume_text) # Generate first question
+        first_question = first_question_chain.run(resume_text=resume_text)
         
-        session_id = str(uuid.uuid4()) # Create new session
+        session_id = str(uuid.uuid4())
         SESSIONS[session_id] = {
             "resume_text": resume_text,
             "chat_history": f"Q1: {first_question}\n",
@@ -104,13 +106,13 @@ def process_answer():
     
     session["chat_history"] += f"A{current_q}: {answer}\n"  
     
-    if current_q < 5: # Check if we need another question (5 questions total)
+    if current_q < 5:
         next_q = next_question_chain.run(  
             resume_text=session["resume_text"],
             chat_history=session["chat_history"]
         )
         
-        current_q += 1 # Update session data
+        current_q += 1
         session["question_num"] = current_q
         session["chat_history"] += f"Q{current_q}: {next_q}\n"
         
@@ -122,18 +124,18 @@ def process_answer():
             session_id=session_id
         )
     else:
-        assessment = assessment_chain.run( # Generate final assessment
+        assessment = assessment_chain.run(
             chat_history=session["chat_history"],
             resume_text=session["resume_text"]
         )
         
-        if os.path.exists(session["filepath"]): # Clean up uploaded file
+        if os.path.exists(session["filepath"]):
             try:
                 os.remove(session["filepath"])
             except:
                 pass
         
-        SESSIONS.pop(session_id, None) # Remove session data
+        SESSIONS.pop(session_id, None)
         
         return render_template(
             'index.html',
@@ -143,3 +145,13 @@ def process_answer():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+# Code comments:
+# This Flask application creates an AI-powered interview system
+# - Uses Gemini API to generate interview questions based on uploaded resume
+# - Stores API key in environment variables using python-dotenv
+# - Creates unique session for each interview
+# - Processes 5 question-answer rounds before generating final assessment
+# - Manages file uploads and cleanup after interview completion
+# - The UPLOAD_FOLDER stores temporary resume files
+# - Each prompt template defines how the AI generates questions and assessments
